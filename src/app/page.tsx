@@ -13,7 +13,6 @@ import {
   FaUsers, FaTrophy, FaBookReader, FaGraduationCap,
   FaBook, FaLightbulb, FaSignOutAlt, FaDatabase, FaBrain, FaSearch
 } from "react-icons/fa";
-import { SiPinecone } from "react-icons/si";
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
