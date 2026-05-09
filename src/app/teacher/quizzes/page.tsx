@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps */
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,17 +11,20 @@ import { Textarea } from '@/components/ui/textarea';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaBrain, FaPlus, FaTrash, FaRobot, FaMagic, FaSpinner, FaCheckCircle } from 'react-icons/fa';
 
-export default function TeacherQuizzesPage() {
+function TeacherQuizzesContent() {
   const [user, setUser] = useState<any>(null);
   const [classes, setClasses] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('');
+  const [selectedTopicId, setSelectedTopicId] = useState('');
+  const [selectedSubjectRoadmap, setSelectedSubjectRoadmap] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [quizForm, setQuizForm] = useState({
     title: '',
@@ -50,6 +54,7 @@ export default function TeacherQuizzesPage() {
   useEffect(() => {
     if (selectedSubject) {
       fetchQuizzes();
+      fetchSubjectRoadmap(selectedSubject);
     }
   }, [selectedSubject]);
 
@@ -66,7 +71,24 @@ export default function TeacherQuizzesPage() {
       const classesRes = await fetch('/api/classes');
       if (classesRes.ok) {
         const classesData = await classesRes.json();
-        setClasses(classesData.classes || []);
+        const nextClasses = classesData.classes || [];
+        setClasses(nextClasses);
+
+        const requestedSubjectId = searchParams.get('subjectId');
+        if (requestedSubjectId) {
+          const subjectRes = await fetch('/api/subjects');
+          if (subjectRes.ok) {
+            const subjectData = await subjectRes.json();
+            const requestedSubject = (subjectData.subjects || []).find((subject: any) => subject._id === requestedSubjectId);
+            if (requestedSubject) {
+              setSelectedClass(requestedSubject.classId?._id || requestedSubject.classId);
+              setSelectedSubject(requestedSubjectId);
+              setShowCreateForm(true);
+            }
+          }
+        } else if (nextClasses.length === 1) {
+          setSelectedClass(nextClasses[0]._id);
+        }
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -81,9 +103,38 @@ export default function TeacherQuizzesPage() {
       if (res.ok) {
         const data = await res.json();
         setSubjects(data.subjects || []);
+        if (selectedSubject && !data.subjects?.some((subject: any) => subject._id === selectedSubject)) {
+          setSelectedSubject('');
+          setSelectedTopicId('');
+          setSelectedSubjectRoadmap(null);
+        }
       }
     } catch (error) {
       console.error('Error fetching subjects:', error);
+    }
+  };
+
+  const fetchSubjectRoadmap = async (subjectId: string) => {
+    try {
+      const res = await fetch(`/api/subjects/roadmap?subjectId=${subjectId}`);
+      if (!res.ok) {
+        setSelectedSubjectRoadmap(null);
+        return;
+      }
+      const data = await res.json();
+      setSelectedSubjectRoadmap(data.subject);
+
+      const requestedTopicId = searchParams.get('topicId');
+      const defaultTopicId = requestedTopicId || data.subject?.roadmap?.topics?.[0]?._id;
+      if (defaultTopicId) {
+        setSelectedTopicId(defaultTopicId.toString());
+        const defaultTopic = data.subject?.roadmap?.topics?.find((topic: any) => topic._id.toString() === defaultTopicId.toString());
+        if (defaultTopic) {
+          setAiForm((prev) => ({ ...prev, topic: defaultTopic.title }));
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching subject roadmap:', error);
     }
   };
 
@@ -117,6 +168,8 @@ export default function TeacherQuizzesPage() {
           subject: subjectName,
           numQuestions: aiForm.numQuestions,
           difficulty: aiForm.difficulty,
+          classLabel: classes.find((cls) => cls._id === selectedClass)?.name || '',
+          roadmapTheme: selectedSubjectRoadmap?.roadmap?.learningTheme || '',
         }),
       });
 
@@ -152,6 +205,8 @@ export default function TeacherQuizzesPage() {
         body: JSON.stringify({
           ...quizForm,
           subjectId: selectedSubject,
+          topicId: selectedTopicId || undefined,
+          topicTitle: aiForm.topic || undefined,
           isAIGenerated: true,
         }),
       });
@@ -275,7 +330,10 @@ export default function TeacherQuizzesPage() {
                 <label className="block font-bold text-gray-700 mb-2">Select Subject</label>
                 <select
                   value={selectedSubject}
-                  onChange={(e) => setSelectedSubject(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedSubject(e.target.value);
+                    setSelectedTopicId('');
+                  }}
                   disabled={!selectedClass}
                   className="w-full p-3 border-3 border-gray-400 rounded-lg font-medium"
                 >
@@ -288,11 +346,16 @@ export default function TeacherQuizzesPage() {
                 </select>
               </div>
             </div>
+            {selectedSubjectRoadmap?.roadmap?.topics?.length ? (
+              <div className="mt-6 rounded-2xl bg-indigo-50 p-4 text-sm text-indigo-800">
+                <p className="font-bold">{selectedSubjectRoadmap.roadmap.learningTheme}</p>
+                <p>{selectedSubjectRoadmap.roadmap.topics.length} roadmap topics are ready for one-click quiz generation.</p>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
         </motion.div>
 
-        {/* Create Quiz Form - Continuation in next message due to length */}
         <AnimatePresence>
           {showCreateForm && selectedClass && selectedSubject && (
             <motion.div
@@ -315,12 +378,35 @@ export default function TeacherQuizzesPage() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                       <div>
                         <label className="block font-bold text-gray-700 mb-2">Topic *</label>
-                        <Input
-                          value={aiForm.topic}
-                          onChange={(e) => setAiForm({ ...aiForm, topic: e.target.value })}
-                          placeholder="e.g., Photosynthesis"
-                          className="border-3 border-gray-400"
-                        />
+                        {selectedSubjectRoadmap?.roadmap?.topics?.length ? (
+                          <select
+                            value={selectedTopicId}
+                            onChange={(e) => {
+                              const nextTopicId = e.target.value;
+                              setSelectedTopicId(nextTopicId);
+                              const topic = selectedSubjectRoadmap.roadmap.topics.find((entry: any) => entry._id.toString() === nextTopicId);
+                              if (topic) {
+                                setAiForm({ ...aiForm, topic: topic.title });
+                                setQuizForm((prev) => ({ ...prev, title: `${topic.title} Quiz` }));
+                              }
+                            }}
+                            className="w-full rounded-lg border-2 border-gray-300 p-3 font-medium"
+                          >
+                            <option value="">Choose a roadmap topic...</option>
+                            {selectedSubjectRoadmap.roadmap.topics.map((topic: any) => (
+                              <option key={topic._id} value={topic._id}>
+                                {topic.title}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <Input
+                            value={aiForm.topic}
+                            onChange={(e) => setAiForm({ ...aiForm, topic: e.target.value })}
+                            placeholder="e.g., Photosynthesis"
+                            className="border-3 border-gray-400"
+                          />
+                        )}
                       </div>
                       <div>
                         <label className="block font-bold text-gray-700 mb-2">Number of Questions</label>
@@ -514,6 +600,7 @@ export default function TeacherQuizzesPage() {
                           <span>📝 {quiz.questions?.length || 0} questions</span>
                           <span>⏱️ {quiz.duration} min</span>
                           <span>📊 {quiz.totalMarks} marks</span>
+                          {quiz.topicTitle && <span>🗺️ {quiz.topicTitle}</span>}
                           {quiz.isAIGenerated && <span className="text-purple-600">🤖 AI Generated</span>}
                         </div>
                       </div>
@@ -532,5 +619,20 @@ export default function TeacherQuizzesPage() {
         )}
       </motion.div>
     </DashboardLayout>
+  );
+}
+
+export default function TeacherQuizzesPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-16 w-16 border-8 border-green-500 border-t-transparent"></div>
+          <p className="mt-4 text-xl font-bold text-gray-700">Loading...</p>
+        </div>
+      </div>
+    }>
+      <TeacherQuizzesContent />
+    </Suspense>
   );
 }

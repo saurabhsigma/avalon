@@ -7,6 +7,20 @@ export interface ISubject extends Document {
   description?: string;
   color: string;
   icon?: string;
+  roadmap?: {
+    generatedAt?: Date;
+    classLabel?: string;
+    learningTheme?: string;
+    topics: {
+      title: string;
+      description: string;
+      order: number;
+      difficulty: 'foundation' | 'core' | 'advanced';
+      estimatedCredits: number;
+      villageName: string;
+      masteryThreshold: number;
+    }[];
+  };
   schedule?: {
     day: string;
     startTime: string;
@@ -43,6 +57,45 @@ const SubjectSchema: Schema = new Schema(
     },
     icon: {
       type: String,
+    },
+    roadmap: {
+      generatedAt: Date,
+      classLabel: String,
+      learningTheme: String,
+      topics: [{
+        title: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        description: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        order: {
+          type: Number,
+          required: true,
+        },
+        difficulty: {
+          type: String,
+          enum: ['foundation', 'core', 'advanced'],
+          default: 'core',
+        },
+        estimatedCredits: {
+          type: Number,
+          default: 10,
+        },
+        villageName: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        masteryThreshold: {
+          type: Number,
+          default: 70,
+        },
+      }],
     },
     schedule: [{
       day: {

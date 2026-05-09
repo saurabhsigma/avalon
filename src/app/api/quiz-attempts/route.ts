@@ -1,8 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import dbConnect from '@/lib/mongodb';
 import QuizAttempt from '@/models/QuizAttempt';
 import Quiz from '@/models/Quiz';
+import { syncTopicProgressFromAttempt } from '@/lib/topicProgress';
 
 export async function GET(req: NextRequest) {
   try {
@@ -18,7 +20,7 @@ export async function GET(req: NextRequest) {
     const quizId = searchParams.get('quizId');
     const studentId = searchParams.get('studentId') || decoded.userId;
 
-    let query: any = { studentId };
+    const query: any = { studentId };
     if (quizId) {
       query.quizId = quizId;
     }
@@ -83,11 +85,21 @@ export async function POST(req: NextRequest) {
       passed,
     });
 
+    const percentage = quiz.totalMarks > 0 ? Math.round((score / quiz.totalMarks) * 1000) / 10 : 0;
+    await syncTopicProgressFromAttempt({
+      studentId: decoded.userId,
+      subjectId: quiz.subjectId.toString(),
+      quizId: quiz._id.toString(),
+      topicId: quiz.topicId?.toString?.() || null,
+      percentage,
+    });
+
     return NextResponse.json({
       attempt,
       score,
       totalMarks: quiz.totalMarks,
       passed,
+      percentage,
       correctCount,
       totalQuestions: quiz.questions.length,
     }, { status: 201 });

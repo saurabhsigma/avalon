@@ -1,14 +1,16 @@
-'use client';
+ 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
 import { FaCheckCircle, FaTimesCircle, FaClock, FaCalendar, FaUsers } from 'react-icons/fa';
 
 export default function TeacherAttendancePage() {
+  // We'll read search params from window.location in client runtime
   const [classes, setClasses] = useState<any[]>([]);
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [students, setStudents] = useState<any[]>([]);
@@ -32,8 +34,10 @@ export default function TeacherAttendancePage() {
       if (response.ok) {
         const data = await response.json();
         setClasses(data.classes || []);
-        if (data.classes?.length > 0) {
-          setSelectedClass(data.classes[0]._id);
+        const classIdFromUrl = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('classId') : null;
+        const defaultClassId = classIdFromUrl || data.classes?.[0]?._id;
+        if (defaultClassId) {
+          setSelectedClass(defaultClassId);
         }
       }
     } catch (error) {
@@ -71,7 +75,7 @@ export default function TeacherAttendancePage() {
   const saveAttendance = async () => {
     setSaving(true);
     try {
-      await fetch('/api/attendance', {
+      const response = await fetch('/api/attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -80,6 +84,12 @@ export default function TeacherAttendancePage() {
           attendance
         })
       });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to save attendance');
+      }
+
       alert('Attendance saved successfully!');
     } catch (error) {
       console.error('Error saving attendance:', error);
@@ -93,6 +103,7 @@ export default function TeacherAttendancePage() {
   const absentCount = students.length - presentCount;
 
   return (
+    <Suspense fallback={<div>Loading...</div>}>
     <DashboardLayout userRole="teacher" userName="Teacher">
       <div className="space-y-6">
         {/* Header */}
@@ -112,6 +123,14 @@ export default function TeacherAttendancePage() {
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="flex justify-end">
+          <Link href={`/teacher/attendance/report${selectedClass ? `?classId=${selectedClass}` : ''}`}>
+            <Button variant="outline" className="border-green-600 text-green-800">
+              View Attendance Report
+            </Button>
+          </Link>
         </div>
 
         {/* Class Selector */}
@@ -267,5 +286,6 @@ export default function TeacherAttendancePage() {
         )}
       </div>
     </DashboardLayout>
+    </Suspense>
   );
 }

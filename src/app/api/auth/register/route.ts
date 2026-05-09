@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
       passwordHash,
       role,
       classId,
+      isVerified: role === 'student',
       language: 'en',
       preferences: {
         theme: 'system',
@@ -78,6 +79,7 @@ export async function POST(req: NextRequest) {
           email: user.email,
           role: user.role,
           classId: user.classId,
+          isVerified: user.isVerified,
         },
       },
       { status: 201 }

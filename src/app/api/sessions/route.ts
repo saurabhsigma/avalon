@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import Session from '@/models/Session';
 import Class from '@/models/Class';
+import Attendance from '@/models/Attendance';
+import Material from '@/models/Material';
 import '@/models/Subject'; // Make sure Subject model is registered
 import connectDB from '@/lib/mongodb';
 
@@ -164,5 +166,46 @@ export async function PUT(req: NextRequest) {
   } catch (error: any) {
     console.error('Update session error:', error);
     return NextResponse.json({ error: 'Failed to update session' }, { status: 500 });
+  }
+}
+
+// Delete session (teacher or admin)
+export async function DELETE(req: NextRequest) {
+  try {
+    const token = req.cookies.get('auth_token')?.value;
+    if (!token) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; role: string };
+    await connectDB();
+
+    const { searchParams } = new URL(req.url);
+    const sessionId = searchParams.get('id');
+
+    if (!sessionId) {
+      return NextResponse.json({ error: 'Session ID is required' }, { status: 400 });
+    }
+
+    const session = await Session.findById(sessionId);
+    if (!session) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    }
+
+    if (decoded.role !== 'admin' && session.teacherId.toString() !== decoded.userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+
+    // Delete related attendance and materials for this session
+    await Promise.all([
+      Attendance.deleteMany({ sessionId }),
+      Material.deleteMany({ sessionId }),
+      Session.findByIdAndDelete(sessionId),
+    ]);
+
+    return NextResponse.json({ message: 'Session deleted' }, { status: 200 });
+  } catch (error: any) {
+    console.error('Delete session error:', error);
+    return NextResponse.json({ error: 'Failed to delete session' }, { status: 500 });
   }
 }

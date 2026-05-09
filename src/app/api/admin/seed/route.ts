@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
       email: 'admin@gmail.com',
       passwordHash,
       role: 'admin',
+      isVerified: true,
       language: 'en',
       isActive: true,
       preferences: {

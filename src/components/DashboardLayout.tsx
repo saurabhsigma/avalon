@@ -53,6 +53,7 @@ export default function DashboardLayout({ children, userRole, userName }: Dashbo
 
   const adminNavItems = [
     { href: '/admin/dashboard', icon: FaHome, label: 'Dashboard' },
+    { href: '/admin/users', icon: FaUsers, label: 'Users' },
     { href: '/admin/notices', icon: FaBullhorn, label: 'Notices' },
     { href: '/admin/analytics', icon: FaChartLine, label: 'Analytics' },
     { href: '/events', icon: FaCalendarAlt, label: 'Events' },

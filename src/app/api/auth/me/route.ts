@@ -43,6 +43,7 @@ export async function GET(req: NextRequest) {
           role: user.role,
           avatar: user.avatar,
           classId: user.classId,
+          isVerified: user.isVerified,
           preferences: user.preferences,
           points: user.points,
           badges: user.badges,

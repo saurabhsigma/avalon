@@ -17,7 +17,7 @@ interface LiveClassRoomProps {
     onLeave?: () => void;
 }
 
-export default function LiveClassRoom({ roomName, userName }: LiveClassRoomProps) {
+export default function LiveClassRoom({ roomName, userName, onLeave }: LiveClassRoomProps) {
     const [token, setToken] = useState('');
     const [preJoinChoices, setPreJoinChoices] = useState<LocalUserChoices | undefined>(undefined);
     const router = useRouter();
@@ -40,7 +40,33 @@ export default function LiveClassRoom({ roomName, userName }: LiveClassRoomProps
         })();
     }, [roomName, userName]);
 
-    const handleLeave = () => {
+    const handleLeave = async () => {
+        // Call external handler if provided
+        if (onLeave) {
+            try {
+                onLeave();
+            } catch (e) {
+                console.error('onLeave handler error:', e);
+            }
+            return;
+        }
+
+        // Otherwise fetch current user role and redirect appropriately
+        try {
+            const res = await fetch('/api/auth/me');
+            if (res.ok) {
+                const data = await res.json();
+                const role = data.user?.role;
+                if (role === 'teacher') {
+                    router.push('/teacher/sessions');
+                    return;
+                }
+            }
+        } catch (e) {
+            console.error('Failed to fetch user role on leave:', e);
+        }
+
+        // Fallback
         router.push('/student/sessions');
     };
 

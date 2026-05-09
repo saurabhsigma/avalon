@@ -76,7 +76,22 @@ export async function POST(req: NextRequest) {
 
     await connectDB();
 
-    const { title, type, url, thumbnail, description, classId, subjectId, sessionId, fileSize, duration, tags } = await req.json();
+    let { title, type, url, thumbnail, description, classId, subjectId, sessionId, fileSize, duration, tags } = await req.json();
+
+    // Normalize incoming type values to allowed enum values
+    const allowedTypes = ['pdf', 'video', 'image', 'link', 'other'];
+    if (typeof type === 'string') {
+      const t = type.toLowerCase();
+      if (t === 'document') {
+        type = 'pdf';
+      } else if (!allowedTypes.includes(t)) {
+        type = 'other';
+      } else {
+        type = t;
+      }
+    } else {
+      type = 'other';
+    }
 
     if (!title || !type || !url || !classId || !subjectId) {
       return NextResponse.json(

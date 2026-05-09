@@ -1,23 +1,94 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
+import TopicJourneyMap from '@/components/TopicJourneyMap';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { 
   FaUsers, FaVideo, FaBook, FaChartLine, 
-  FaPlus, FaClock, FaCalendarAlt 
+  FaPlus, FaClock
 } from "react-icons/fa";
 
 export default function TeacherDashboard() {
   const [stats, setStats] = useState({
-    totalClasses: 5,
-    totalStudents: 127,
-    upcomingSessions: 8,
-    avgAttendance: 87
+    totalClasses: 0,
+    totalStudents: 0,
+    upcomingSessions: 0,
+    avgAttendance: 0
   });
+  const [classes, setClasses] = useState<any[]>([]);
+  const [subjectRoadmaps, setSubjectRoadmaps] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchOverview = async () => {
+      try {
+        const res = await fetch('/api/teacher/overview');
+        if (res.ok) {
+          const data = await res.json();
+          setStats({
+            totalClasses: data.totalClasses || 0,
+            totalStudents: data.totalStudents || 0,
+            upcomingSessions: data.upcomingSessions || 0,
+            avgAttendance: data.avgAttendance || 0,
+          });
+          setClasses(data.classes || []);
+          setSubjectRoadmaps(data.subjectRoadmaps || []);
+        }
+      } catch (err) {
+        console.error('Failed to load teacher overview', err);
+      }
+    };
+
+    fetchOverview();
+  }, []);
+
+  const [recentSessions, setRecentSessions] = useState<any[]>([]);
+  const fetchRecentSessions = async () => {
+    try {
+      const res = await fetch('/api/sessions');
+      if (res.ok) {
+        const data = await res.json();
+        setRecentSessions(data.sessions?.slice(0,6) || []);
+      }
+    } catch (err) {
+      console.error('Failed to load recent sessions', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchRecentSessions();
+  }, []);
+
+  const deleteSession = async (sessionId: string) => {
+    if (!confirm('Delete this session and its attendance/materials?')) return;
+    try {
+      const res = await fetch(`/api/sessions?id=${sessionId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to delete session');
+      }
+      // refresh
+      fetchRecentSessions();
+      // refresh overview
+      const ov = await fetch('/api/teacher/overview');
+      if (ov.ok) {
+        const data = await ov.json();
+        setStats({
+          totalClasses: data.totalClasses || 0,
+          totalStudents: data.totalStudents || 0,
+          upcomingSessions: data.upcomingSessions || 0,
+          avgAttendance: data.avgAttendance || 0,
+        });
+        setSubjectRoadmaps(data.subjectRoadmaps || []);
+      }
+    } catch (e: any) {
+      alert(e.message || 'Failed to delete session');
+    }
+  };
 
   return (
     <DashboardLayout userRole="teacher" userName="Teacher">
@@ -32,7 +103,7 @@ export default function TeacherDashboard() {
             <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
               Teacher Dashboard
             </h1>
-            <p className="text-gray-600 font-medium mt-2">Welcome back! Here's your overview for today 🚀</p>
+            <p className="text-gray-600 font-medium mt-2">Welcome back! Here&apos;s your overview for today 🚀</p>
           </div>
           <Link href="/teacher/classes/create">
             <motion.div 
@@ -124,6 +195,58 @@ export default function TeacherDashboard() {
           ))}
         </div>
 
+        {/* Class Performance */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle>Class Performance</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {classes.length === 0 ? (
+                <div className="py-6 text-gray-600">No class performance data available.</div>
+              ) : (
+                <div className="space-y-4">
+                  {classes.map((cls) => (
+                    <div key={cls.id} className="border rounded p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <div className="font-semibold text-lg">{cls.name}</div>
+                          <div className="text-sm text-gray-600">Students: {cls.studentsCount}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm text-gray-500">Avg Attendance</div>
+                          <div className="font-bold">{cls.classAttendanceAvg}%</div>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-2 md:grid-cols-3">
+                        {cls.students.slice(0,9).map((s: any) => (
+                          <div key={s.id} className="p-2 border rounded flex items-center justify-between">
+                            <div>
+                              <div className="font-medium">{s.name}</div>
+                              <div className="text-xs text-gray-500">{s.email}</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm text-gray-500">Attendance</div>
+                              <div className="font-semibold">{s.attendanceRate}%</div>
+                              <div className="text-sm text-gray-500">Tests Avg</div>
+                              <div className="font-semibold">{s.testAvg !== null ? `${s.testAvg}%` : '—'}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+
         {/* Quick Actions */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -175,7 +298,41 @@ export default function TeacherDashboard() {
           </Card>
         </motion.div>
 
-        {/* Recent Activity */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          <Card className="gradient-card border-2 border-white shadow-2xl">
+            <CardHeader>
+              <CardTitle className="text-2xl font-bold bg-gradient-to-r from-sky-600 to-indigo-600 bg-clip-text text-transparent">
+                Topic Journey Maps
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {subjectRoadmaps.length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-6 text-slate-600">
+                  Generate a subject roadmap to unlock the village view and per-topic performance hover cards.
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {subjectRoadmaps.map((roadmap) => (
+                    <TopicJourneyMap
+                      key={roadmap.subjectId}
+                      role="teacher"
+                      subjectName={`${roadmap.subjectName} • ${roadmap.className}`}
+                      subjectColor={roadmap.color}
+                      learningTheme={roadmap.learningTheme}
+                      topics={roadmap.topicStats}
+                    />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Recent Sessions */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -187,22 +344,31 @@ export default function TeacherDashboard() {
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
                   <FaClock className="text-white" />
                 </div>
-                Recent Activity
+                Recent Sessions
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <motion.div 
-                whileHover={{ scale: 1.02 }}
-                className="flex items-center gap-6 p-6 glass-card border-2 border-purple-200 hover:border-purple-400 transition-all"
-              >
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-3xl shadow-lg">
-                  🎯
+              {recentSessions.length === 0 ? (
+                <div className="p-6 text-gray-600">No recent sessions. Schedule one to start.</div>
+              ) : (
+                <div className="space-y-3">
+                  {recentSessions.map((s) => (
+                    <div key={s._id} className="flex items-center justify-between p-4 rounded-lg border">
+                      <div>
+                        <p className="font-semibold text-gray-900">{s.title}</p>
+                        <p className="text-sm text-gray-600">{new Date(s.scheduledAt).toLocaleString()}</p>
+                        <p className="text-xs text-gray-500">{s.status}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Link href={`/teacher/sessions/${s._id}`}> 
+                          <Button variant="outline">View</Button>
+                        </Link>
+                        <Button variant="destructive" onClick={() => deleteSession(s._id)}>Delete</Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex-1">
-                  <p className="font-bold text-lg text-gray-800">No recent activities yet</p>
-                  <p className="text-gray-600">Start creating classes and sessions to see your activity here!</p>
-                </div>
-              </motion.div>
+              )}
             </CardContent>
           </Card>
         </motion.div>

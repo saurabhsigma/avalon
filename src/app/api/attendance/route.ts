@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import Attendance from '@/models/Attendance';
 import Session from '@/models/Session';
+import Class from '@/models/Class';
+import Subject from '@/models/Subject';
 import connectDB from '@/lib/mongodb';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
@@ -21,6 +23,8 @@ export async function GET(req: NextRequest) {
     const sessionId = searchParams.get('sessionId');
     const studentId = searchParams.get('studentId');
     const classId = searchParams.get('classId');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
 
     let query: any = {};
 
@@ -35,8 +39,24 @@ export async function GET(req: NextRequest) {
       query.sessionId = sessionId;
     }
 
+    if (classId) {
+      query.classId = classId;
+    }
+
+    if (startDate || endDate) {
+      query.date = {};
+      if (startDate) {
+        query.date.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        query.date.$lte = end;
+      }
+    }
+
     const attendance = await Attendance.find(query)
-      .populate('sessionId', 'title scheduledAt')
+      .populate('sessionId', 'title scheduledAt status')
       .populate('studentId', 'name email')
       .sort({ joinTime: -1 });
 
@@ -79,7 +99,11 @@ export async function POST(req: NextRequest) {
     if (body.classId && body.date && body.attendance) {
       const { classId, date, attendance: attendanceMap } = body;
 
-      // Find a session for this class on this date
+      const classData = await Class.findOne({ _id: classId, teacherId: decoded.userId });
+      if (!classData) {
+        return NextResponse.json({ error: 'You can only mark attendance for your own class' }, { status: 403 });
+      }
+
       const targetDate = new Date(date);
       const startOfDay = new Date(targetDate);
       startOfDay.setHours(0, 0, 0, 0);
@@ -87,16 +111,53 @@ export async function POST(req: NextRequest) {
       const endOfDay = new Date(targetDate);
       endOfDay.setHours(23, 59, 59, 999);
 
-      // Find the most recent session for this day to mark attendance against
-      const session = await Session.findOne({
+      let session = await Session.findOne({
         classId,
-        scheduledAt: { $gte: startOfDay, $lte: endOfDay }
+        teacherId: decoded.userId,
+        scheduledAt: { $gte: startOfDay, $lte: endOfDay },
       }).sort({ scheduledAt: -1 });
 
       if (!session) {
-        return NextResponse.json(
-          { error: 'No session found for this date. Please create a session first.' },
-          { status: 404 }
+        let subjectId = classData.subjects?.[0];
+
+        if (!subjectId) {
+          const manualSubject = await Subject.findOneAndUpdate(
+            { classId, teacherId: decoded.userId, name: 'General Attendance' },
+            {
+              $setOnInsert: {
+                name: 'General Attendance',
+                classId,
+                teacherId: decoded.userId,
+                description: 'Auto-created subject for manual attendance',
+                color: '#22c55e',
+              },
+            },
+            { upsert: true, new: true }
+          );
+
+          subjectId = manualSubject._id;
+          await Class.findByIdAndUpdate(classId, { $addToSet: { subjects: subjectId } });
+        }
+
+        const dateKey = targetDate.toISOString().split('T')[0];
+        const livekitRoomId = `manual-attendance-${classId}-${dateKey}`;
+
+        session = await Session.findOneAndUpdate(
+          { livekitRoomId },
+          {
+            $setOnInsert: {
+              title: `Manual Attendance - ${dateKey}`,
+              classId,
+              subjectId,
+              teacherId: decoded.userId,
+              livekitRoomId,
+              scheduledAt: targetDate,
+              duration: 0,
+              description: 'Auto-created manual attendance session',
+              status: 'completed',
+            },
+          },
+          { upsert: true, new: true }
         );
       }
 
@@ -105,12 +166,12 @@ export async function POST(req: NextRequest) {
       for (const [studentId, isPresent] of Object.entries(attendanceMapAny)) {
         updates.push({
           updateOne: {
-            filter: { sessionId: session._id, studentId },
+            filter: { sessionId: session!._id, studentId },
             update: {
               $set: {
                 status: (isPresent ? 'present' : 'absent') as 'present' | 'absent',
-                classId: session.classId,
-                subjectId: session.subjectId,
+                classId: session!.classId,
+                subjectId: session!.subjectId,
                 date: targetDate,
                 updatedAt: new Date()
               },

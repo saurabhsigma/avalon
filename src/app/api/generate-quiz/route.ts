@@ -16,13 +16,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Only teachers can generate quizzes' }, { status: 403 });
     }
 
-    const { topic, subject, numQuestions, difficulty } = await req.json();
+    const { topic, subject, numQuestions, difficulty, classLabel, roadmapTheme } = await req.json();
 
     if (!topic || !numQuestions) {
       return NextResponse.json({ error: 'Topic and number of questions required' }, { status: 400 });
     }
 
-    const prompt = `Generate ${numQuestions} multiple choice questions about ${topic}${subject ? ` in ${subject}` : ''}${difficulty ? ` at ${difficulty} difficulty level` : ''}.
+    const prompt = `Generate ${numQuestions} multiple choice questions about ${topic}${subject ? ` in ${subject}` : ''}${classLabel ? ` for ${classLabel}` : ''}${difficulty ? ` at ${difficulty} difficulty level` : ''}${roadmapTheme ? ` using the learning world theme "${roadmapTheme}" only as light flavor` : ''}.
 
 For each question, provide:
 1. The question text

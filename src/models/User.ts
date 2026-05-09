@@ -7,6 +7,7 @@ export interface IUser extends Document {
   role: 'teacher' | 'student' | 'admin'
   classId?: mongoose.Types.ObjectId
   avatar?: string
+  isVerified: boolean
   language: 'en' | 'hi' | 'es' | 'fr'
   isActive: boolean
   lastLogin?: Date
@@ -52,6 +53,10 @@ const UserSchema = new Schema<IUser>(
       ref: 'Class',
     },
     avatar: String,
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
     language: {
       type: String,
       enum: ['en', 'hi', 'es', 'fr'],

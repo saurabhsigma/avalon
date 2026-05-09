@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Indie_Flower } from "next/font/google";
 import "./globals.css";
-import AIChatbot from "@/components/AIChatbot";
-import FloatingDecorations from "@/components/FloatingDecorations";
+import { MotionConfig } from "framer-motion";
 
 const inter = Inter({ subsets: ["latin"] });
 const indieFlower = Indie_Flower({ 
@@ -26,10 +25,8 @@ export default function RootLayout({
       <head>
         <link href="https://fonts.googleapis.com/css2?family=Indie+Flower&display=swap" rel="stylesheet" />
       </head>
-      <body className={inter.className}>
-        <FloatingDecorations />
-        {children}
-        <AIChatbot />
+      <body className={`${inter.className} motion-off`}>
+        <MotionConfig reducedMotion="always">{children}</MotionConfig>
       </body>
     </html>
   );

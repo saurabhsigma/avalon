@@ -68,6 +68,29 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.motion-off *,
+.motion-off *::before,
+.motion-off *::after {
+  animation: none !important;
+  animation-delay: 0s !important;
+  animation-duration: 0s !important;
+  animation-iteration-count: 1 !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+
+.motion-off .animate-spin,
+.motion-off .animate-pulse,
+.motion-off .animate-bounce,
+.motion-off .animate-ping,
+.motion-off .animate-blob,
+.motion-off .animate-fade-in-up,
+.motion-off .floating-icon-slow,
+.motion-off .shooting-star,
+.motion-off .twinkle-star {
+  animation: none !important;
+}
+
 /* Enable GPU acceleration for animations */
 .glass-card, .gradient-card, .doodle-card, .stat-card {
   will-change: transform;

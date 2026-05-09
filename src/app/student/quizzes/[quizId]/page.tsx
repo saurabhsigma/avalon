@@ -82,25 +82,33 @@ export default function TakeQuizPage() {
         }
     };
 
-    const submitQuiz = () => {
+    const submitQuiz = async () => {
         if (isSubmitted) return;
 
-        let calculatedScore = 0;
-        quiz.questions.forEach((q: any, index: number) => {
-            if (answers[index] === q.correctAnswer) {
-                calculatedScore += 1; // Simplify scoring (1 point per question or distribute total marks)
+        try {
+            const answersArray = Object.entries(answers).map(([qIdx, ans]) => ({
+                questionIndex: parseInt(qIdx),
+                selectedAnswer: ans,
+            }));
+
+            const res = await fetch('/api/quiz-attempts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ quizId, answers: answersArray }),
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setScore(data.score);
+                setIsSubmitted(true);
+            } else {
+                const error = await res.json();
+                alert(error.error || 'Failed to submit quiz');
             }
-        });
-
-        // Calculate marks
-        const marksPerQ = quiz.totalMarks / quiz.questions.length;
-        const finalScore = Math.round(calculatedScore * marksPerQ);
-
-        setScore(finalScore);
-        setIsSubmitted(true);
-
-        // Ideally send score to backend API (to implement later: /api/results)
-        // console.log('Score:', finalScore);
+        } catch (error) {
+            console.error('Error submitting quiz:', error);
+            alert('An error occurred while submitting your quiz');
+        }
     };
 
     const formatTime = (seconds: number) => {

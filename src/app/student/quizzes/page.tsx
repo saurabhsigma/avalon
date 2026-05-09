@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps */
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
 import { FaBrain, FaClock, FaCheckCircle, FaTimesCircle, FaTrophy } from 'react-icons/fa';
 
-export default function StudentQuizzesPage() {
+function StudentQuizzesContent() {
   const [user, setUser] = useState<any>(null);
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [selectedQuiz, setSelectedQuiz] = useState<any>(null);
@@ -19,6 +20,7 @@ export default function StudentQuizzesPage() {
   const [attempts, setAttempts] = useState<any[]>([]);
   const [viewMode, setViewMode] = useState<'list' | 'attempt' | 'review'>('list');
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     fetchData();
@@ -38,10 +40,13 @@ export default function StudentQuizzesPage() {
         const subjectsRes = await fetch(`/api/subjects?classId=${userData.user.classId}`);
         if (subjectsRes.ok) {
           const subjectsData = await subjectsRes.json();
-          const subjectIds = subjectsData.subjects.map((s: any) => s._id);
+          const requestedSubjectId = searchParams.get('subjectId');
+          const subjectIds = subjectsData.subjects
+            .filter((s: any) => !requestedSubjectId || s._id === requestedSubjectId)
+            .map((s: any) => s._id);
 
           const quizzesPromises = subjectIds.map((id: string) =>
-            fetch(`/api/quizzes?subjectId=${id}`).then(r => r.json())
+            fetch(`/api/quizzes?subjectId=${id}${searchParams.get('topicId') ? `&topicId=${searchParams.get('topicId')}` : ''}`).then(r => r.json())
           );
           const quizzesResults = await Promise.all(quizzesPromises);
           const allQuizzes = quizzesResults.flatMap(r => r.quizzes || []);
@@ -371,5 +376,17 @@ export default function StudentQuizzesPage() {
         )}
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function StudentQuizzesPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="inline-block animate-spin rounded-full h-16 w-16 border-8 border-green-500 border-t-transparent"></div>
+      </div>
+    }>
+      <StudentQuizzesContent />
+    </Suspense>
   );
 }

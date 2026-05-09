@@ -197,16 +197,17 @@ export default function LoginPage() {
                 <p className="font-bold text-blue-900 mb-2">🎯 Demo Credentials:</p>
                 <p className="text-blue-800"><strong>Teacher:</strong> teacher2@gmail.com / 123456</p>
                 <p className="text-blue-800"><strong>Student:</strong> student3@gmail.com / 123456</p>
+                <p className="text-blue-800"><strong>Admin:</strong> admin / admin123</p>
               </motion.div>
 
               <div className="space-y-2">
                 <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
                   <FaUser className="text-green-600" />
-                  Email
+                  Email or Admin
                 </label>
                 <Input
-                  type="email"
-                  placeholder="teacher2@gmail.com or student3@gmail.com"
+                  type="text"
+                  placeholder="teacher2@gmail.com, student3@gmail.com, or admin"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required

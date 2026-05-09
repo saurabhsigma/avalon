@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import Quiz from '@/models/Quiz';
@@ -18,11 +19,13 @@ export async function GET(req: NextRequest) {
     await connectDB();
 
     const { searchParams } = new URL(req.url);
+    const quizId = searchParams.get('id');
     const subjectId = searchParams.get('subjectId');
+    const topicId = searchParams.get('topicId');
     const classId = searchParams.get('classId');
     const sessionId = searchParams.get('sessionId');
 
-    let query: any = {};
+    const query: any = {};
 
     // If teacher, optionally filter by their creation? 
     // Actually, if a teacher is viewing a class, they should see all quizzes for that class/subject
@@ -33,6 +36,10 @@ export async function GET(req: NextRequest) {
       query.createdBy = decoded.userId;
     }
 
+    if (quizId) {
+      query._id = quizId;
+    }
+
     if (subjectId) {
       query.subjectId = subjectId;
     } else if (classId) {
@@ -40,6 +47,10 @@ export async function GET(req: NextRequest) {
       const subjects = await Subject.find({ classId }).select('_id');
       const subjectIds = subjects.map((s: any) => s._id);
       query.subjectId = { $in: subjectIds };
+    }
+
+    if (topicId) {
+      query.topicId = topicId;
     }
 
     if (sessionId) {
@@ -79,6 +90,8 @@ export async function POST(req: NextRequest) {
       title,
       description,
       subjectId,
+      topicId,
+      topicTitle,
       sessionId,
       questions,
       duration,
@@ -107,6 +120,8 @@ export async function POST(req: NextRequest) {
       title,
       description,
       subjectId,
+      topicId: topicId || undefined,
+      topicTitle: topicTitle || undefined,
       sessionId,
       questions,
       duration,
@@ -123,5 +138,37 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('Create quiz error:', error);
     return NextResponse.json({ error: 'Failed to create quiz' }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const token = req.cookies.get('auth_token')?.value;
+    if (!token) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; role: string };
+    if (decoded.role !== 'teacher') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+
+    await connectDB();
+
+    const { searchParams } = new URL(req.url);
+    const quizId = searchParams.get('id');
+    if (!quizId) {
+      return NextResponse.json({ error: 'Quiz id is required' }, { status: 400 });
+    }
+
+    const deleted = await Quiz.findOneAndDelete({ _id: quizId, createdBy: decoded.userId });
+    if (!deleted) {
+      return NextResponse.json({ error: 'Quiz not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ message: 'Quiz deleted successfully' }, { status: 200 });
+  } catch (error: any) {
+    console.error('Delete quiz error:', error);
+    return NextResponse.json({ error: 'Failed to delete quiz' }, { status: 500 });
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import Class from '@/models/Class';
+import '@/models/Subject';
 import connectDB from '@/lib/mongodb';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
@@ -28,6 +29,15 @@ export async function GET(req: NextRequest) {
       
       if (!classData) {
         return NextResponse.json({ error: 'Class not found' }, { status: 404 });
+      }
+
+      if (decoded.role === 'teacher') {
+        // teacherId may be populated (object) or a raw id (string/ObjectId)
+        const ownerId = (classData.teacherId as any)?._id?.toString?.() || String(classData.teacherId || '');
+
+        if (ownerId !== decoded.userId) {
+          return NextResponse.json({ error: 'You can only view your own classes' }, { status: 403 });
+        }
       }
       
       return NextResponse.json({ class: classData }, { status: 200 });

@@ -43,8 +43,8 @@ export async function GET(req: NextRequest) {
 
     const teachersWithClasses = await Promise.all(
       teachers.map(async (teacher) => {
-        const classCount = await Class.countDocuments({ teacher: teacher._id });
-        const sessionCount = await Session.countDocuments({ teacher: teacher._id });
+        const classCount = await Class.countDocuments({ teacherId: teacher._id });
+        const sessionCount = await Session.countDocuments({ teacherId: teacher._id });
         return {
           ...teacher,
           classCount,
@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
 
     // Get all students with their attendance
     const students = await User.find({ role: 'student' })
-      .select('name email classId isActive lastLogin createdAt')
+      .select('name email classId isActive isVerified lastLogin createdAt')
       .populate('classId', 'name')
       .lean();
 
@@ -102,6 +102,11 @@ export async function GET(req: NextRequest) {
       recentUsers,
       teachers: teachersWithClasses,
       students: studentsWithStats,
+      classes: await Class.find()
+        .populate('teacherId', 'name email isActive isVerified')
+        .populate('students', 'name email isActive isVerified')
+        .sort({ createdAt: -1 })
+        .lean(),
     });
   } catch (error: any) {
     console.error('Error fetching admin analytics:', error);

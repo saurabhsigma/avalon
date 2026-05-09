@@ -21,7 +21,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Find user with password field
-    const user = await User.findOne({ email: email.toLowerCase() }).select('+passwordHash');
+    const normalizedEmail = String(email).toLowerCase();
+    const lookupEmail = normalizedEmail === 'admin' ? 'admin@gmail.com' : normalizedEmail;
+
+    const user = await User.findOne({ email: lookupEmail }).select('+passwordHash');
     if (!user) {
       return NextResponse.json(
         { error: 'Invalid credentials' },
@@ -63,6 +66,7 @@ export async function POST(req: NextRequest) {
           role: user.role,
           avatar: user.avatar,
           classId: user.classId,
+          isVerified: user.isVerified,
         },
       },
       { status: 200 }

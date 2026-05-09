@@ -4,6 +4,8 @@ export interface IQuiz extends Document {
   title: string;
   description?: string;
   subjectId: mongoose.Types.ObjectId;
+  topicId?: mongoose.Types.ObjectId;
+  topicTitle?: string;
   sessionId?: mongoose.Types.ObjectId;
   questions: {
     question: string;
@@ -35,6 +37,13 @@ const QuizSchema: Schema = new Schema(
       type: Schema.Types.ObjectId,
       ref: 'Subject',
       required: true,
+    },
+    topicId: {
+      type: Schema.Types.ObjectId,
+    },
+    topicTitle: {
+      type: String,
+      trim: true,
     },
     sessionId: {
       type: Schema.Types.ObjectId,
@@ -83,5 +92,6 @@ const QuizSchema: Schema = new Schema(
 );
 
 QuizSchema.index({ subjectId: 1, createdAt: -1 });
+QuizSchema.index({ subjectId: 1, topicId: 1, createdAt: -1 });
 
 export default mongoose.models.Quiz || mongoose.model<IQuiz>('Quiz', QuizSchema);
